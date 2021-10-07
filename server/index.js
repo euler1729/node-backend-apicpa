@@ -163,7 +163,7 @@ app.get("/topcntry", (req, res)=>{
 })
 
 //requires range in source_params
-async function mintegral(source_params){
+async function mintegral_advanced(source_params){
 
     const now=Date.now();
     console.log("Fetching from mintegral API...");
@@ -228,14 +228,48 @@ async function mintegral(source_params){
     return ans;
 }
 
+async function mintegral(source_params, func){
+    console.log("Fetching from mintegral API...");
+
+    const now = Date.now();
+    const closetime = now-now%dayToMs(1)-dayToMs(1);
+
+    const timestamp = Math.floor( (new Date()).getTime()/1000 ).toString();
+    const api_key="a0f2ca38a43ce39ce8d4408cfa590111";
+    const username="ziau";
+    const mintegral_url="https://ss-api.mintegral.com/api/v1/reports/data?" + "username=" + username + "&token=" + md5(api_key + md5(timestamp)) + "&timestamp=" + timestamp;
+
+    const params={
+        timezone: "+6",
+        start_time: Math.floor((closetime-dayToMs(source_params.range-1))/1000),
+        end_time: Math.floor((closetime)/1000),
+    }
+    const data=await axios.get(mintegral_url, {params});
+    const ans=await func(data.data.data);
+
+    console.log(`Fetched ${data.data.data.length} data in ${Date.now()-now}ms`);
+
+    // console.log(ans);
+    return ans;
+}
+
+app.get("/mint", (req, res)=>{
+    def_params={
+        range: 3
+    };
+    mintegral(def_params)
+    .then(data=>{res.send(data);})
+    .catch(err=>{console.log(err);});
+})
+
 //requires metrics and range in source_params
-async function is(source_params) {
+async function is(source_params, func) {
 
     const now = Date.now();
     console.log("Fetching from ironSource API...");
 
     const auth_url="https://platform.ironsrc.com/partners/publisher/auth";
-    const req_url="https://platform.ironsrc.com/partners/publisher/mediation/applications/v6/stats";
+    const req_url="https://api.ironsrc.com/advertisers/v2/reports?";
     const headers={
         secretkey: '7f9d6dcdc53d127e16df780183d8554a',
         refreshToken: '90a0340af3ae4858a8245e8b49dfad4d'
@@ -244,6 +278,7 @@ async function is(source_params) {
         startDate: pastDay(source_params.range),
         endDate: pastDay(1),
         metrics: source_params.metrics,
+        breakdowns: "day"
         // breakdown: "date"
     }
     if(!ironSource_auth) {
@@ -256,26 +291,9 @@ async function is(source_params) {
         },
         params: params
     })
-    console.log(`Fetched ${data.data.length} data from ironSource in ${Date.now()-now}ms`);
-
-    const compress = (arr) =>{
-        let crr=[];
-        for(let i in arr){
-            const pushObj=crr.find(obj=>obj.date===arr[i].date);
-            if(!pushObj){
-                crr.push({
-                    date: arr[i].date,
-                    eCPM: parseFloat(arr[i].data[0].eCPM)
-                })
-            }
-            else pushObj.eCPM=parseFloat(arr[i].data[0].eCPM)+pushObj.eCPM;
-        }
-        return new Promise((res, rej)=>{
-            res(crr);
-        })
-    }
-
-    return compress(data.data);
+    console.log(`Fetched ${data.data.data.length} data from ironSource in ${Date.now()-now}ms`);
+    const ans=await func(data.data.data);
+    return ans;
 }
 
 //requires range in source_params
@@ -290,8 +308,9 @@ async function applovin(source_params){
         format: "json",
         start: pastDay(source_params.range),
         end: pastDay(1),
-        sort_day: "ASC",
-        columns: "day,ecpm"
+        sort_day: "DESC",
+        columns: "day,average_cpa",
+        report_type: "advertiser"
     }
     const data=await axios.get(applovin_url, {params});
     console.log(`Fetched ${data.data.results.length} data from applovin in ${Date.now()-now}ms`);
@@ -305,10 +324,43 @@ async function compareAPIdata(source_params, token){
 
     const date=await dateList({start: now-dayToMs(source_params.range-1), end: now});
 
-    const mintegral_data=await mintegral(source_params)
-    const ironSource_data=await is(source_params);
+    const mintegral_data=await mintegral(source_params, (arr)=>{
+        const brr=[];
+        for(let i=0; i<arr.length-1; i++){
+            let pushObj=brr.find(obj=>obj.date===arr[i].date)
+            if(!pushObj){
+                brr.push({
+                    date: arr[i].date,
+                    install: arr[i].install,
+                    spend: arr[i].spend,
+                    cpi: 0
+                })
+            }
+            else {
+                pushObj.install += arr[i].install;
+                pushObj.spend += arr[i].spend;
+            }
+        }
+        for(let obj of brr) obj.cpi=obj.install/obj.spend;
+        return new Promise((res, rej)=>{
+            res(brr);
+        });
+    })
+    mintegral_data.sort((a, b)=>a.date>b.date?1:-1);
+    const ironSource_data=await is(source_params, (arr)=>{
+        const brr=[];
+        for(let i in arr){
+            brr.push({
+                date: arr[i].date.slice(0, 10),
+                cpa: arr[i].spend?parseFloat(arr[i].installs)/arr[i].spend:0
+            })
+        }
+        return brr;
+    });
+    ironSource_data.sort((a, b)=>a.date>b.date?1:-1);
     const applovin_data=await applovin(source_params);
-    
+    applovin_data.sort((a, b)=>a.date>b.date?1:-1);
+
     const datagen = (date, mint, is, aplov) => {
         let brr={
             labels:[],
@@ -319,27 +371,27 @@ async function compareAPIdata(source_params, token){
 
         brr.datasets.push({
             label: "mintegral",
-            data: mintegral_data[0].date===date[0]?[mintegral_data[0].eCPM]:[0],
+            data: mintegral_data[0].date===date[0]?[mintegral_data[0].cpi]:[0],
             borderColor: "#C0C0C0",
             tension: 0.5
         })
         brr.datasets.push({
             label: "ironSource",
-            data: ironSource_data[0].date===date[0]?[ironSource_data[0].eCPM]:[0],
+            data: ironSource_data[0].date===date[0]?[ironSource_data[0].cpa]:[0],
             borderColor: "#808080",
             tension: 0.5
         })
         brr.datasets.push({
             label: "applovin",
-            data: applovin_data[0].day===date[0]?[applovin_data[0].ecpm]:[0],
+            data: applovin_data[0].day===date[0]?[applovin_data[0].average_cpa]:[0],
             borderColor: "#CD5C5C",
             tension: 0.5
         })
 
         for(let i=1; i<date.length; i++){
-            brr.datasets[0].data.push(mintegral_data[i].date===date[i]?mintegral_data[i].eCPM:0);
-            brr.datasets[1].data.push(ironSource_data[i].date===date[i]?ironSource_data[i].eCPM:0);
-            brr.datasets[2].data.push(applovin_data[i].day===date[i]?applovin_data[i].ecpm:0);
+            brr.datasets[0].data.push(mintegral_data[i].date===date[i]?mintegral_data[i].cpi:0);
+            brr.datasets[1].data.push(ironSource_data[i].date===date[i]?ironSource_data[i].cpa:0);
+            brr.datasets[2].data.push(applovin_data[i].day===date[i]?applovin_data[i].average_cpa:0);
         }
         return new Promise((res, rej)=>{
             res(brr);
@@ -352,7 +404,7 @@ async function compareAPIdata(source_params, token){
 }
 
 app.get("/compApi", (req, res)=>{
-    const def_params={range: 3, metrics: "eCPM"};
+    const def_params={range: 3, metrics: "installs,spend"};
     if(Object.keys(req.query).length){
         def_params.range=req.query.range;
     }
