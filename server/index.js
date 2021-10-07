@@ -298,7 +298,7 @@ async function applovin(source_params){
     return data.data.results;
 }
 
-async function compareAPIdata(source_params){
+async function compareAPIdata(source_params, token){
 
     let now = Date.now();
     now = now-now%dayToMs(1)-dayToMs(1);
@@ -346,7 +346,9 @@ async function compareAPIdata(source_params){
         })
     }
     // return {mintegral_data, ironSource_data, applovin_data};
-    return datagen(date, mintegral_data, ironSource_data, applovin_data);
+    id_ans[token]=await datagen(date, mintegral_data, ironSource_data, applovin_data);
+    id_success[token]=true;
+    return ;
 }
 
 app.get("/compApi", (req, res)=>{
@@ -354,10 +356,12 @@ app.get("/compApi", (req, res)=>{
     if(Object.keys(req.query).length){
         def_params.range=req.query.range;
     }
-    compareAPIdata(def_params)
-    .then(data=>{res.send(data);})
-    .catch(err=>{console.log(err);});
 
+    const token=uuidv4();
+    id_success[token]=false;
+    res.send(token);
+
+    compareAPIdata(def_params, token);
 })
 
 //86400000
