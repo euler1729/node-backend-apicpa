@@ -47,7 +47,8 @@ module.exports=class CPAGraph{
                         label: arr[i].campaign_package_name,
                         data: [0],
                         borderColor: color[brr.datasets.length-1],
-                        tension: 0.5
+                        tension: 0.5,
+                        borderWidth:1,
                     })
                     for(let j=1; j<date.length && arr[i].day !== date[j]; j++) 
                         brr.datasets[brr.datasets.length-1].data.push(0);
@@ -57,7 +58,8 @@ module.exports=class CPAGraph{
                     label:arr[i].campaign_package_name,
                     data: [parseFloat(arr[i].average_cpa)],
                     borderColor: color[brr.datasets.length-1],
-                    tension: 0.5
+                    tension: 0.5,
+                    borderWidth:1,
                 });
             }
             else {
