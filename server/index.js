@@ -2,7 +2,6 @@ const express = require('express');
 const cors = require("cors");
 const axios = require('axios');
 const {v4 : uuidv4} = require('uuid');
-const { json, application } = require('express');
 const md5 = require('js-md5');
 const app = express();
 
@@ -28,72 +27,37 @@ const endPoint={
     maxReport: "maxReport",
     report: "report"
 }
-const fourteendays=1209600000;// 14 days in millisecond
-const hourToMs = (time) => time*36*1e5;
-const dayToMs = (day) => day*864*1e5;
-
-async function dateList(range, networkURL){
-
-    const params={
-        api_key: "U_6ufDXDPxfXT5mJr1TXCfBDawPb6mmr3W01UHfLA6tC5gS_R-aTMng9oG4vXLk7wDJL8H_UKPGL3QtereTazI",
-        format: "json",
-        end: range.end,
-        start: range.start,
-        sort_day: "ASC",
-        columns: "day",
-        report_type: "advertiser"
-    }
-    const dates = await axios.get(networkURL, {params}).catch(err=>{console.log(err);});
-    return new Promise((res, rej)=>{
-        res(dates.data.results);
-    })
+const fourteendays=1209600000;              // 14 days in millisecond
+const hourToMs = (time) => time*36*1e5;     //converts one hour to millisecond
+const dayToMs = (day) => day*864*1e5;       //converts one day to millisecond
+const pastDay = (days) =>{                  //finds the date (days) before now. pastDay(1) is the date of yesterday in the form YYYY-MM-DD
+    let time = Date.now();
+    time = time - time%dayToMs(1) - dayToMs(days);
+    return (new Date(time)).toJSON().slice(0, 10); 
+}                                           
+const pastTime = (hours) =>{                //finds the time (hours) before now. pastTime(1) is the last complete hour in the form HH:MM
+    let time = Date.now();
+    time = time - time%hourToMs(1) - hourToMs(hours);
+    return (new Date(time)).toJSON().slice(11, 16);
 }
 
-function compare(fdata, sdata, params){
-    
-    function binarySearch(arr, val, compare) {
-        var m = 0;
-        var n = arr.length - 1;
-        while (m <= n) {
-            var k = (n + m) >> 1;
-            var cmp = compare(val, arr[k]);
-            if (cmp > 0) {
-                m = k + 1;
-            } else if(cmp < 0) {
-                n = k - 1;
-            } else {
-                return k;
-            }
-        }
-        return -m - 1;
+//range must have start and end properties. both in milliseconds
+async function dateList(range){
+
+    let brr=[];
+    let pushDate=range.start;
+    brr.push((new Date(pushDate).toJSON().slice(0, 10)));
+
+    while(pushDate!==range.end){
+        pushDate+=dayToMs(1);
+        brr.push((new Date(pushDate).toJSON().slice(0, 10)));
     }
 
     return new Promise((res, rej)=>{
-        let ans = [];
-
-        for (let i = 0; i < fdata.length; ++i) {
-            let dif = 0.0;
-            const j = binarySearch(sdata, fdata[i], (a, b)=>{
-                if(a.key>b.key) return 1;
-                if(a.key < b.key) return -1
-                return 0;
-            })
-            if(j>=0) {
-                dif = parseFloat(fdata[i].estimated_revenue) - parseFloat(sdata[j].estimated_revenue);
-                let mn = Math.min(parseFloat(fdata[i].estimated_revenue), parseFloat(sdata[j].estimated_revenue));
-                if (mn)
-                    dif = ((dif) / mn) * 100;
-                if (Math.abs(dif) >= params.min_dif && fdata[i].estimated_revenue >=params.min_rev) {
-                    ans.push(fdata[i]);
-                    ans[ans.length - 1].dif = parseInt(dif);
-                    ans[ans.length - 1].estimated_revenue = parseFloat(ans[ans.length - 1].estimated_revenue.slice(0, 7));
-                    ans[ans.length - 1].estimated_revenue_2 = parseFloat(sdata[j].estimated_revenue.slice(0, 7));
-                }
-            }
-        }
-        res(ans);
+        res(brr);
     })
 }
+
 
 // function compress(arr){
 
@@ -114,126 +78,7 @@ function compare(fdata, sdata, params){
 // }
 const id_success=[];
 const id_ans=[];
-async function fetcher(source_params, token){
-
-    console.log(`Fetching from ${url}...`);
-    let fetchStart = Date.now();
-
-    const fdata=[];
-    const sdata=[];
-    let keymap=[];
-    let keyno=0;
-    const dif=source_params.end-source_params.start;
-
-    const populateData = (arr, brr, keyAdded) =>{
-        return new Promise((res, rej)=>{
-            for(let i in arr) brr.push(keyAdded(arr[i], brr.length));
-            res();
-        })
-    }
-    const sortData = (data) => {
-        return new Promise((res, rej)=>{
-            data.sort((a, b)=>a.key<b.key?-1:1);
-            res();
-        })
-    }
-    
-    const params = {
-        api_key: "U_6ufDXDPxfXT5mJr1TXCfBDawPb6mmr3W01UHfLA6tC5gS_R-aTMng9oG4vXLk7wDJL8H_UKPGL3QtereTazI",
-        format: "json",
-        start: source_params.start,
-        end: source_params.end,
-        filter_application: "Shark World,Shark Attack,Dino Battle,DINO WORLD,Dinosaur Zoo",
-        columns: "day,application,network,network_placement,country,estimated_revenue"
-    };
-    console.log(Date.now());
-    console.log(params);
-    
-    const fdatafetch = await axios.get(url + endPoint.maxReport, {params});
-
-    console.log(`Fetched ${fdatafetch.data.results.length} data in ${Date.now()-fetchStart}ms`);
-
-    await populateData(fdatafetch.data.results, fdata, (obj)=>{
-        const key = obj.application.replace(/\s/g, '')+obj.network+obj.network_placement+obj.country;
-        if(typeof(keymap[key]) === 'undefined') keymap[key] = keyno++;
-        obj.key = keymap[key];
-        return obj;
-    });
-
-    fetchStart = Date.now();
-    params.start -= dif;
-    params.end -= dif;
-
-    const sdatafetch = await axios.get(url + endPoint.maxReport, {params});
-
-    console.log(`Fetched ${sdatafetch.data.results.length} data in ${Date.now()-fetchStart}ms`);
-
-    await populateData(sdatafetch.data.results, sdata, (obj, i)=>{
-        const key = obj.application.replace(/\s/g, '')+obj.network+obj.network_placement+obj.country;
-        if(typeof(keymap[key]) === 'undefined') keymap[key] = keyno++; 
-        obj.key = keymap[key];
-        return obj;
-    });
-    await sortData(sdata);
-
-    const ans = await compare(fdata, sdata, source_params);
-
-    return new Promise((res, rej)=>{
-        id_ans[token] = ans;
-        id_success[token] = true;
-        console.log("total warnings found: " + id_ans[token].length);
-        res({ans: id_ans[token], fdata: fdata, sdata: sdata});
-    })
-    
-}
-
-function param_handler(params){
-
-    const hourToMs = (time) => time*36*1e5;
-    const now = Date.now();
-    const closeTime = now-now%hourToMs(1)-hourToMs(1);
-    if(params.time_int>=0){
-        params.time_int = hourToMs(params.time_int);
-        if(params.time_int>fourteendays) return 0;
-        params.end = closeTime;
-        params.start = closeTime-params.time_int;
-    } else {
-        params.start = Date.parse(params.start);
-        params.end = Date.parse(params.end);
-        if(params.end<params.start) return 0;
-    }
-    return 1;    
-}
-
-app.get("/api", (req, res)=>{
-    const def_params = {
-        start: date.getFullYear().toString() +"-"+ ("0" + (date.getMonth()+1)).slice(-2) +"-"+ ("0" + date.getDate()).slice(-2)
-            + "T" + ("0" + (date.getHours()-1)).slice(-2) + ":00:00",
-        end: date.getFullYear().toString() +"-"+ ("0" + (date.getMonth()+1)).slice(-2) +"-"+ ("0" + date.getDate()).slice(-2)
-            + "T" + ("0" + (date.getHours()-1)).slice(-2) + ":00:00",
-        min_dif: 0,
-        min_rev: 0,
-        time_int: -3
-    }
-    if(Object.keys(req.query).length){
-        console.log(req.query);
-        def_params.start = req.query.start;
-        def_params.end = req.query.end;
-        def_params.min_dif = parseInt(req.query.min_dif);
-        def_params.min_rev = parseFloat(req.query.min_rev);
-        def_params.time_int = parseInt(req.query.time_int);
-    }
-
-    if(!param_handler(def_params)) res.status(400).send("Query Invalid");
-    else{
-        const token = uuidv4();
-        id_success[token] = false;
-        res.send(token);
-        fetcher(def_params, token)
-        .catch(err=>{console.log(err);});
-    }
-    
-})
+var ironSource_auth;
 
 app.get("/com", (req, res)=>{
     const token = req.query.token;
@@ -247,206 +92,53 @@ app.get("/com", (req, res)=>{
     else res.status(404).send("Loading");
 })
 
-const gra_success=[];
-const gra_ans=[];
-
-async function fracture(arr, date){
-
-    const color = [
-        "#ff3399", "#33ccff", "#99ff33", "#FF0000",	"#800000", "#FFFF00", "#808000", "#00FF00 ", "#008000 ", "#00FFFF", "#008080",
-        "#0000FF", "#cc99ff", "#FF00FF", "#800080", "#CD5C5C"];
-    let brr={
-        labels:[],
-        datasets:[]
-    };
-    for(let i=0; i<date.length; i++) brr.labels.push(date[i].day);
-
-    for(let i=0; i<arr.length; i++){
-
-        const pushobj = brr.datasets.find(obj=>obj.label===arr[i].campaign_package_name);
-        if(!pushobj) {
-            if(arr[i].day !== date[0].day){
-                brr.datasets.push({
-                    label: arr[i].campaign_package_name,
-                    data: [0],
-                    borderColor: color[brr.datasets.length],
-                    backgroundColor: color[brr.datasets.length],
-                    tension: 0.5,
-                    borderWidth:1,
-                })
-                for(let j=1; j<date.length && arr[i].day !== date[j].day; j++) 
-                    brr.datasets[brr.datasets.length-1].data.push(0);
-                brr.datasets[brr.datasets.length-1].data.push(parseFloat(arr[i].average_cpa));
-            }
-            else brr.datasets.push({
-                label:arr[i].campaign_package_name,
-                data: [parseFloat(arr[i].average_cpa)],
-                borderColor: color[brr.datasets.length],
-                backgroundColor: color[brr.datasets.length],
-                tension: 0.5,
-                borderWidth: 1,
-            });
-        }
-        else {
-            const days = date.findIndex(obj=>obj.day===arr[i].day);
-            while(pushobj.data.length < days) pushobj.data.push(0);
-            pushobj.data.push(parseFloat(arr[i].average_cpa));
-        }
-
+app.get("/api", (req, res)=>{
+    const def_params = {
+        start: pastDay(0) + 'T' + pastTime(3),
+        end: pastDay(0) + 'T' + pastTime(1),
+        filter_app: "Shark World,Shark Attack,Dino Battle,DINO WORLD,Dinosaur Zoo",
+        min_dif: 0,
+        min_rev: 0,
+        time_int: -3
     }
-    return new Promise((res, rej)=>{
-        res(brr);
-    })
-}
-
-async function repGraph(source_params, token){
-
-    const now = Date.now();
-    const closeTime = now-now%dayToMs(1)-dayToMs(1);
-
-    const params={
-        api_key: "U_6ufDXDPxfXT5mJr1TXCfBDawPb6mmr3W01UHfLA6tC5gS_R-aTMng9oG4vXLk7wDJL8H_UKPGL3QtereTazI",
-        format: "json",
-        end: closeTime,
-        start: closeTime-dayToMs(source_params.range-1),
-        sort_day: "ASC",
-        columns: "day,campaign_package_name,average_cpa",
-        report_type: "advertiser"
+    if(Object.keys(req.query).length){
+        def_params.start = req.query.start;
+        def_params.end = req.query.end;
+        if(req.query.filter_app) def_params.filter_app=req.query.filter_app;
+        def_params.min_dif = parseInt(req.query.min_dif);
+        def_params.min_rev = parseFloat(req.query.min_rev);
+        def_params.time_int = parseInt(req.query.time_int);
     }
 
-    const time_req = Date.now();
+    const WarningTable = require("../warning_table.js");
+    console.log(typeof(WarningTable));
+    const warning_table = new WarningTable(id_success, id_ans)
 
-    console.log(`Fetching from ${url+endPoint.report}...`);
-
-    const dates = await dateList({start: params.start, end: params.end}, url+endPoint.report);
-    const data = await axios.get(url+endPoint.report, {params})
-    console.log(`Fetched ${data.data.results.length} rows in ${Date.now()-time_req}ms`);
-    const fracturedData = await fracture(data.data.results, dates);
-    id_ans[token]=fracturedData;
-    id_success[token]=true;
-    return;
-}
+    if(!warning_table.param_handler(def_params)) res.status(400).send("Query Invalid");
+    else {
+        const token=uuidv4();
+        id_success[token]=false;
+        warning_table.setToken(token);
+        res.send(token);
+        warning_table.fetcher(def_params);
+    }
+})
 
 app.get("/rep", (req, res)=>{
 
     def_params={range: 3};
     if(Object.keys(req.query).length)def_params.range=req.query.range;
 
+    const CPAGraph=require('../cpa_graph.js');
+    const cpa_graph=new CPAGraph(id_success, id_ans);
+
     const token=uuidv4();
-    gra_success[token]=false;
+    id_success[token]=false;
+    cpa_graph.setToken(token);
     res.send(token);
-    repGraph(def_params, token);
+    cpa_graph.repGraph(def_params);
 
 })
-
-function compress_country(crr){
-    const arr = JSON.parse(JSON.stringify(crr));
-    return new Promise((res, rej)=>{
-        const brr=[];
-        if(!arr[0].country.length) arr[0].country='aa';
-        brr.push(arr[0]);
-        brr[0].average_cpa = parseFloat(brr[0].average_cpa);
-        for(let i=1; i<arr.length; i++){
-            if(!arr[i].country.length) arr[i].country='aa';
-            if(arr[i].country===arr[i-1].country) {
-                brr[brr.length-1].average_cpa = parseFloat(arr[i].average_cpa) + brr[brr.length-1].average_cpa;
-            }
-            else {
-                brr.push(arr[i]);
-                brr[brr.length-1].average_cpa = parseFloat(brr[brr.length-1].average_cpa);
-            }
-        }
-        brr.sort((a, b)=>a.average_cpa<b.average_cpa?1:-1);
-        const country = [];
-        for(let i=0; i<5 && i<brr.length; i++) country.push(brr[i].country);
-        res(country);
-    })
-}
-
-function datagen(arr, country, date){
-    return new Promise((res, rej)=>{
-        const color =["#000080","#00FF00","#800080","#FF0000","#FFFF00"];
-        const brr={
-            labels: [],
-            datasets: []
-        };
-        for(let i=0; i<date.length; i++) brr.labels.push(date[i].day);
-        arr.sort((a, b)=>a.day>b.day?1:-1);
-        for(let i=0; i<arr.length; i++){
-            
-            if(arr[i].country==='') arr[i].country='aa';
-            if(country.find(cntry=>cntry===arr[i].country)){
-                const pushobj = brr.datasets.find(obj=>obj.label===arr[i].country);
-                if(!pushobj) {
-                    if(arr[i].day !== date[0].day){
-                        brr.datasets.push({
-                            label: arr[i].country,
-                            data: [0],
-                            borderColor: color[brr.datasets.length],
-                            backgroundColor: color[brr.datasets.length],
-                            tension: 0.5,
-                            borderWidth:1,
-                            // fill: true,
-                        });
-                        for(let j=1; j<date.length && arr[i].day !== date[j].day; j++) 
-                            brr.datasets[brr.datasets.length-1].data.push(0);
-                        brr.datasets[brr.datasets.length-1].data.push(parseFloat(arr[i].average_cpa));
-                    }
-                    else
-                        brr.datasets.push({
-                            label: arr[i].country,
-                            data: [parseFloat(arr[i].average_cpa)],
-                            borderColor: color[brr.datasets.length],
-                            backgroundColor: color[brr.datasets.length],
-                            tension: 0.5,
-                            borderWidth:1,
-                            // fill: true,
-                        });
-                }
-                else {
-                    const days = date.findIndex(obj=>obj.day===arr[i].day);
-                    while(pushobj.data.length < days) pushobj.data.push(0);
-                    pushobj.data.push(parseFloat(arr[i].average_cpa));
-                }
-            }
-
-        }
-        res(brr);
-    })
-}
-
-async function topcntry(source_params, token){
-    
-    const now = Date.now();
-    const closeTime = now-now%dayToMs(1)-dayToMs(1);
-
-    const params={
-        api_key: "U_6ufDXDPxfXT5mJr1TXCfBDawPb6mmr3W01UHfLA6tC5gS_R-aTMng9oG4vXLk7wDJL8H_UKPGL3QtereTazI",
-        format: "json",
-        end: closeTime,
-        start: closeTime-dayToMs(source_params.range-1),
-        filter_campaign_package_name: source_params.filter,
-        sort_country: "ASC",
-        columns: "day,country,cost,average_cpa",
-        report_type: "advertiser"
-    }
-
-    console.log(`Fetching from ${url+endPoint.report}...`);
-
-    const dates = await dateList({start: params.start, end: params.end}, url+endPoint.report);
-    const data = await axios.get(url+endPoint.report, {params}).catch(err=>{console.log(err);});
-    const topCountryList = await compress_country(data.data.results);
-    const ans = await datagen(data.data.results, topCountryList, dates);
-
-    console.log(`Send Data for top five cpa counties in ${Date.now()-now}ms`);
-
-    return new Promise((res, rej)=>{
-        id_success[token]=true;
-        id_ans[token]=ans;
-        res();
-    })
-    
-}
 
 app.get("/topcntry", (req, res)=>{
 //com.fpg.sharkattack
@@ -459,44 +151,71 @@ app.get("/topcntry", (req, res)=>{
         def_params.filter = req.query.filter;
     }
 
+    const CPACountryGraph=require('../cpa_country_graph');
+    const cpa_country_graph=new CPACountryGraph(id_success, id_ans);
+
     const token=uuidv4();
     id_success[token]=false;
+    cpa_country_graph.setToken(token);
     res.send(token);
 
-    topcntry(def_params, token).catch(err=>{console.log(err);});
+    cpa_country_graph.topcntry(def_params);
 })
 
+//requires range in source_params
 async function mintegral(source_params){
 
-    const past = (days) =>{
-        let time = Date.now();
-        time = time - time%dayToMs(1) - dayToMs(days);
-        return (new Date(time)).toJSON().slice(0, 10);
-    }
+    const now=Date.now();
+    console.log("Fetching from mintegral API...");
 
     const timestamp = Math.floor( (new Date()).getTime()/1000 ).toString();
     const api_key="a0f2ca38a43ce39ce8d4408cfa590111";
     const username="ziau";
-    const mintegral="https://ss-api.mintegral.com/api/v2/reports/data?" + "username=" + username + "&token=" + md5(api_key + md5(timestamp)) + "&timestamp=" + timestamp;
+    const mintegral_url="https://ss-api.mintegral.com/api/v2/reports/data?" + "username=" + username + "&token=" + md5(api_key + md5(timestamp)) + "&timestamp=" + timestamp;
 
     const params={
         timezone: "+6",
-        start_time: past(source_params.range-1),
-        end_time: past(1),
+        start_time: pastDay(source_params.range),
+        end_time: pastDay(1),
         format: "JSON",
         dimenstion_type: 0,
         type: 1
     }
-    const reception = await axios.get(mintegral, {params});
+    const reception = await axios.get(mintegral_url, {params});
     params.type=2;
 
     let ans=[];
     let success=false;
+
+    const objectifyData = (arr, dest_params) =>{
+        const brr=arr.split('\n');
+        brr[0]=brr[0].split('\t');
+        for(let i in brr[0]) brr[0][i] = brr[0][i].replace(/\s/g, '');
+        let crr=[];
+        for(let i=1; i<brr.length-1; i++){
+            brr[i]=brr[i].split('\t');
+            brr[i][0] = brr[i][0].slice(0, 4) + '-' + brr[i][0].slice(4, 6) + '-' + brr[i][0].slice(6);
+            const pushObj=crr.find(ob=>ob.date===brr[i][0]);
+            if(!pushObj) {
+                crr.push({
+                    date: brr[i][0],
+                    eCPM: parseFloat(brr[i][7])
+                });
+            }
+            else{
+                pushObj.eCPM = parseFloat(brr[i][7]) + pushObj.eCPM;
+            }            
+        }
+        return new Promise((res, rej)=>{
+            res(crr);
+        })
+    }
+
     const ping = async () =>{
-        const responce = await axios.get(mintegral, {params});
+        const responce = await axios.get(mintegral_url, {params});
         if(responce.status===200){
             success=true;
-            ans=responce.data;
+            ans=await objectifyData(responce.data);
             return 1;
         }
         else setInterval(() => {
@@ -504,20 +223,141 @@ async function mintegral(source_params){
         }, 750);
     }
     await ping();
+    // console.log(ans);
+    console.log(`Fetched ${ans.length} data from mintegral in ${Date.now()-now}ms`);
     return ans;
 }
 
-app.get("/twoApi", (req, res)=>{
-    const def_params={
-        range: 3
+//requires metrics and range in source_params
+async function is(source_params) {
+
+    const now = Date.now();
+    console.log("Fetching from ironSource API...");
+
+    const auth_url="https://platform.ironsrc.com/partners/publisher/auth";
+    const req_url="https://platform.ironsrc.com/partners/publisher/mediation/applications/v6/stats";
+    const headers={
+        secretkey: '7f9d6dcdc53d127e16df780183d8554a',
+        refreshToken: '90a0340af3ae4858a8245e8b49dfad4d'
     }
-    if(Object.keys(req.query).length){
-        def_params.range = req.query.range
+    const params={
+        startDate: pastDay(source_params.range),
+        endDate: pastDay(1),
+        metrics: source_params.metrics,
+        // breakdown: "date"
+    }
+    if(!ironSource_auth) {
+        const auth_res=await axios.get(auth_url, {headers: headers});
+        ironSource_auth = auth_res.data;
+    }
+    const data=await axios.get(req_url, {
+        headers: {
+            Authorization: 'Bearer ' + ironSource_auth
+        },
+        params: params
+    })
+    console.log(`Fetched ${data.data.length} data from ironSource in ${Date.now()-now}ms`);
+
+    const compress = (arr) =>{
+        let crr=[];
+        for(let i in arr){
+            const pushObj=crr.find(obj=>obj.date===arr[i].date);
+            if(!pushObj){
+                crr.push({
+                    date: arr[i].date,
+                    eCPM: parseFloat(arr[i].data[0].eCPM)
+                })
+            }
+            else pushObj.eCPM=parseFloat(arr[i].data[0].eCPM)+pushObj.eCPM;
+        }
+        return new Promise((res, rej)=>{
+            res(crr);
+        })
     }
 
-    mintegral(def_params)
-    .then(data=>res.send(data))
+    return compress(data.data);
+}
+
+//requires range in source_params
+async function applovin(source_params){
+
+    const now=Date.now();
+    console.log("Fetching from applovin API...");
+
+    const applovin_url="https://r.applovin.com/report";
+    const params={
+        api_key: "U_6ufDXDPxfXT5mJr1TXCfBDawPb6mmr3W01UHfLA6tC5gS_R-aTMng9oG4vXLk7wDJL8H_UKPGL3QtereTazI",
+        format: "json",
+        start: pastDay(source_params.range),
+        end: pastDay(1),
+        sort_day: "ASC",
+        columns: "day,ecpm"
+    }
+    const data=await axios.get(applovin_url, {params});
+    console.log(`Fetched ${data.data.results.length} data from applovin in ${Date.now()-now}ms`);
+    return data.data.results;
+}
+
+async function compareAPIdata(source_params){
+
+    let now = Date.now();
+    now = now-now%dayToMs(1)-dayToMs(1);
+
+    const date=await dateList({start: now-dayToMs(source_params.range-1), end: now});
+
+    const mintegral_data=await mintegral(source_params)
+    const ironSource_data=await is(source_params);
+    const applovin_data=await applovin(source_params);
+    
+    const datagen = (date, mint, is, aplov) => {
+        let brr={
+            labels:[],
+            datasets:[]
+        };
+
+        for(let i in date) brr.labels.push(date[i]);
+
+        brr.datasets.push({
+            label: "mintegral",
+            data: mintegral_data[0].date===date[0]?[mintegral_data[0].eCPM]:[0],
+            borderColor: "#C0C0C0",
+            tension: 0.5
+        })
+        brr.datasets.push({
+            label: "ironSource",
+            data: ironSource_data[0].date===date[0]?[ironSource_data[0].eCPM]:[0],
+            borderColor: "#808080",
+            tension: 0.5
+        })
+        brr.datasets.push({
+            label: "applovin",
+            data: applovin_data[0].day===date[0]?[applovin_data[0].ecpm]:[0],
+            borderColor: "#CD5C5C",
+            tension: 0.5
+        })
+
+        for(let i=1; i<date.length; i++){
+            brr.datasets[0].data.push(mintegral_data[i].date===date[i]?mintegral_data[i].eCPM:0);
+            brr.datasets[1].data.push(ironSource_data[i].date===date[i]?ironSource_data[i].eCPM:0);
+            brr.datasets[2].data.push(applovin_data[i].day===date[i]?applovin_data[i].ecpm:0);
+        }
+        return new Promise((res, rej)=>{
+            res(brr);
+        })
+    }
+    // return {mintegral_data, ironSource_data, applovin_data};
+    return datagen(date, mintegral_data, ironSource_data, applovin_data);
+}
+
+app.get("/compApi", (req, res)=>{
+    const def_params={range: 3, metrics: "eCPM"};
+    if(Object.keys(req.query).length){
+        def_params.range=req.query.range;
+    }
+    compareAPIdata(def_params)
+    .then(data=>{res.send(data);})
     .catch(err=>{console.log(err);});
+
 })
 
 //86400000
