@@ -53,7 +53,7 @@ module.exports=class CPACountryGraph{
 
     datagen(arr, country, date){
         return new Promise((res, rej)=>{
-            const color =["#000080","#00FF00","#800080","#FF0000","#FFFF00"];
+            const color =["#CB4335","#7D3C98","#21618C","#1E8449","#F1C40F"];
             const brr={
                 labels: [],
                 datasets: []
@@ -71,6 +71,7 @@ module.exports=class CPACountryGraph{
                                 label: arr[i].country,
                                 data: [0],
                                 borderColor: color[brr.datasets.length-1],
+                                backgroundColor: color[brr.datasets.length-1],
                                 tension: 0.5,
                                 borderWidth:1,
                             });
@@ -83,6 +84,7 @@ module.exports=class CPACountryGraph{
                                 label: arr[i].country,
                                 data: [parseFloat(arr[i].average_cpa)],
                                 borderColor: color[brr.datasets.length-1],
+                                backgroundColor: color[brr.datasets.length-1],
                                 tension: 0.5,
                                 borderWidth:1,
                             });

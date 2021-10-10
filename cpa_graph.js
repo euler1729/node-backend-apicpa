@@ -30,7 +30,7 @@ module.exports=class CPAGraph{
     async fracture(arr, date){
 
         const color = [
-            "#C0C0C0", "#808080", "#000000", "#FF0000",	"#800000", "#FFFF00", "#808000", "#00FF00 ", "#008000 ", "#00FFFF", "#008080",
+            "#FF7F50", "#DE3163", "#000000", "#FF0000",	"#800000", "#FFFF00", "#808000", "#00FF00 ", "#008000 ", "#00FFFF", "#008080",
             "#0000FF", "#000080", "#FF00FF", "#800080", "#CD5C5C"];
         let brr={
             labels:[],
@@ -47,6 +47,7 @@ module.exports=class CPAGraph{
                         label: arr[i].campaign_package_name,
                         data: [0],
                         borderColor: color[brr.datasets.length-1],
+                        backgroundColor: color[brr.datasets.length-1],
                         tension: 0.5,
                         borderWidth:1,
                     })
@@ -58,6 +59,7 @@ module.exports=class CPAGraph{
                     label:arr[i].campaign_package_name,
                     data: [parseFloat(arr[i].average_cpa)],
                     borderColor: color[brr.datasets.length-1],
+                    backgroundColor: color[brr.datasets.length-1],
                     tension: 0.5,
                     borderWidth:1,
                 });

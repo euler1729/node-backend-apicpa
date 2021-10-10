@@ -80,99 +80,38 @@ const id_success=[];
 const id_ans=[];
 var ironSource_auth;
 
-app.get("/com", (req, res)=>{
-    const token = req.query.token;
-    if(id_success[token]) {
-        res.status(200).json(id_ans[token]);
-        setTimeout(() => {
-            delete id_success[token];
-            delete id_ans[token];
-        }, 600000);
-    }
-    else res.status(404).send("Loading");
-})
 
-app.get("/api", (req, res)=>{
-    const def_params = {
-        start: pastDay(0) + 'T' + pastTime(3),
-        end: pastDay(0) + 'T' + pastTime(1),
-        filter_app: "Shark World,Shark Attack,Dino Battle,DINO WORLD,Dinosaur Zoo",
-        min_dif: 0,
-        min_rev: 0,
-        time_int: -3
-    }
-    if(Object.keys(req.query).length){
-        def_params.start = req.query.start;
-        def_params.end = req.query.end;
-        if(req.query.filter_app) def_params.filter_app=req.query.filter_app;
-        def_params.min_dif = parseInt(req.query.min_dif);
-        def_params.min_rev = parseFloat(req.query.min_rev);
-        def_params.time_int = parseInt(req.query.time_int);
-    }
 
-    const WarningTable = require("../warning_table.js");
-    console.log(typeof(WarningTable));
-    const warning_table = new WarningTable(id_success, id_ans)
-
-    if(!warning_table.param_handler(def_params)) res.status(400).send("Query Invalid");
-    else {
-        const token=uuidv4();
-        id_success[token]=false;
-        warning_table.setToken(token);
-        res.send(token);
-        warning_table.fetcher(def_params);
-    }
-})
 
 app.get("/rep", (req, res)=>{
 
     def_params={range: 3};
     if(Object.keys(req.query).length)def_params.range=req.query.range;
-
+    
     const CPAGraph=require('../cpa_graph.js');
     const cpa_graph=new CPAGraph(id_success, id_ans);
-
+    
     const token=uuidv4();
     id_success[token]=false;
     cpa_graph.setToken(token);
     res.send(token);
     cpa_graph.repGraph(def_params);
-
+    
 })
 
-app.get("/topcntry", (req, res)=>{
-//com.fpg.sharkattack
-    const def_params={
-        range: 3,
-        filter: "com.fpg.sharkattack",
-    }
-    if(Object.keys(req.query).length){
-        def_params.range = req.query.range;
-        def_params.filter = req.query.filter;
-    }
 
-    const CPACountryGraph=require('../cpa_country_graph');
-    const cpa_country_graph=new CPACountryGraph(id_success, id_ans);
-
-    const token=uuidv4();
-    id_success[token]=false;
-    cpa_country_graph.setToken(token);
-    res.send(token);
-
-    cpa_country_graph.topcntry(def_params);
-})
 
 //requires range in source_params
 async function mintegral(source_params){
 
     const now=Date.now();
     console.log("Fetching from mintegral API...");
-
+    
     const timestamp = Math.floor( (new Date()).getTime()/1000 ).toString();
     const api_key="a0f2ca38a43ce39ce8d4408cfa590111";
     const username="ziau";
     const mintegral_url="https://ss-api.mintegral.com/api/v2/reports/data?" + "username=" + username + "&token=" + md5(api_key + md5(timestamp)) + "&timestamp=" + timestamp;
-
+    
     const params={
         timezone: "+6",
         start_time: pastDay(source_params.range),
@@ -183,12 +122,12 @@ async function mintegral(source_params){
     }
     const reception = await axios.get(mintegral_url, {params});
     params.type=2;
-
+    
     let ans=[];
     let success=false;
-
+    
     const objectifyData = (arr, dest_params) =>{
-        const brr=arr.split('\n');
+        const brr=arr.toString().split('\n');
         brr[0]=brr[0].split('\t');
         for(let i in brr[0]) brr[0][i] = brr[0][i].replace(/\s/g, '');
         let crr=[];
@@ -230,7 +169,7 @@ async function mintegral(source_params){
 
 //requires metrics and range in source_params
 async function is(source_params) {
-
+    
     const now = Date.now();
     console.log("Fetching from ironSource API...");
 
@@ -257,7 +196,7 @@ async function is(source_params) {
         params: params
     })
     console.log(`Fetched ${data.data.length} data from ironSource in ${Date.now()-now}ms`);
-
+    
     const compress = (arr) =>{
         let crr=[];
         for(let i in arr){
@@ -274,16 +213,16 @@ async function is(source_params) {
             res(crr);
         })
     }
-
+    
     return compress(data.data);
 }
 
 //requires range in source_params
 async function applovin(source_params){
-
+    
     const now=Date.now();
     console.log("Fetching from applovin API...");
-
+    
     const applovin_url="https://r.applovin.com/report";
     const params={
         api_key: "U_6ufDXDPxfXT5mJr1TXCfBDawPb6mmr3W01UHfLA6tC5gS_R-aTMng9oG4vXLk7wDJL8H_UKPGL3QtereTazI",
@@ -299,24 +238,25 @@ async function applovin(source_params){
 }
 
 async function compareAPIdata(source_params, token){
-
+    
     let now = Date.now();
     now = now-now%dayToMs(1)-dayToMs(1);
-
-    const date=await dateList({start: now-dayToMs(source_params.range-1), end: now});
-
+    
+    const dates=await dateList({start: now-dayToMs(source_params.range-1), end: now});
+    
     const mintegral_data=await mintegral(source_params)
     const ironSource_data=await is(source_params);
     const applovin_data=await applovin(source_params);
     
     const datagen = (date, mint, is, aplov) => {
+        console.log(date);
         let brr={
             labels:[],
             datasets:[]
         };
-
+        
         for(let i in date) brr.labels.push(date[i]);
-
+        
         brr.datasets.push({
             label: "mintegral",
             data: mintegral_data[0].date===date[0]?[mintegral_data[0].eCPM]:[0],
@@ -344,7 +284,7 @@ async function compareAPIdata(source_params, token){
             borderWidth:1,
             // fill: true,
         })
-
+        
         for(let i=1; i<date.length; i++){
             brr.datasets[0].data.push(mintegral_data[i].date===date[i]?mintegral_data[i].eCPM:0);
             brr.datasets[1].data.push(ironSource_data[i].date===date[i]?ironSource_data[i].eCPM:0);
@@ -355,24 +295,86 @@ async function compareAPIdata(source_params, token){
         })
     }
     // return {mintegral_data, ironSource_data, applovin_data};
-    id_ans[token]=await datagen(date, mintegral_data, ironSource_data, applovin_data);
+    id_ans[token]=await datagen(dates, mintegral_data, ironSource_data, applovin_data);
     id_success[token]=true;
     return ;
 }
+app.get("/api", (req, res)=>{
+    const def_params = {
+        start: pastDay(0) + 'T' + pastTime(3),
+        end: pastDay(0) + 'T' + pastTime(1),
+        filter_app: "Shark World,Shark Attack,Dino Battle,DINO WORLD,Dinosaur Zoo",
+        min_dif: 0,
+        min_rev: 0,
+        time_int: -3
+    }
+    if(Object.keys(req.query).length){
+        def_params.start = req.query.start;
+        def_params.end = req.query.end;
+        if(req.query.filter_app) def_params.filter_app=req.query.filter_app;
+        def_params.min_dif = parseInt(req.query.min_dif);
+        def_params.min_rev = parseFloat(req.query.min_rev);
+        def_params.time_int = parseInt(req.query.time_int);
+    }
 
+    const WarningTable = require("../warning_table.js");
+    console.log(typeof(WarningTable));
+    const warning_table = new WarningTable(id_success, id_ans)
+    
+    if(!warning_table.param_handler(def_params)) res.status(400).send("Query Invalid");
+    else {
+        const token=uuidv4();
+        id_success[token]=false;
+        warning_table.setToken(token);
+        res.send(token);
+        warning_table.fetcher(def_params);
+    }
+})
+app.get("/topcntry", (req, res)=>{
+    //com.fpg.sharkattack
+    const def_params={
+            range: 3,
+            filter: "com.fpg.sharkattack",
+        }
+        if(Object.keys(req.query).length){
+            def_params.range = req.query.range;
+            def_params.filter = req.query.filter;
+        }
+        
+        const CPACountryGraph=require('../cpa_country_graph');
+        const cpa_country_graph=new CPACountryGraph(id_success, id_ans);
+        
+        const token=uuidv4();
+        id_success[token]=false;
+        cpa_country_graph.setToken(token);
+        res.send(token);
+        
+        cpa_country_graph.topcntry(def_params);
+    })
 app.get("/compApi", (req, res)=>{
     const def_params={range: 3, metrics: "eCPM"};
     if(Object.keys(req.query).length){
         def_params.range=req.query.range;
     }
-
+    
     const token=uuidv4();
     id_success[token]=false;
     res.send(token);
-
+    
     compareAPIdata(def_params, token);
 })
 
+app.get("/com", (req, res)=>{
+    const token = req.query.token;
+    if(id_success[token]) {
+        res.status(200).json(id_ans[token]);
+        setTimeout(() => {
+            delete id_success[token];
+            delete id_ans[token];
+        }, 600000);
+    }
+    else res.status(404).send("Loading");
+})
 //86400000
 app.listen(PORT, ()=>{
     console.log(`listening to port ${PORT}...`);
