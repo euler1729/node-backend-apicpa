@@ -96,7 +96,7 @@ app.get("/api", (req, res)=>{
     const def_params = {
         start: pastDay(0) + 'T' + pastTime(3),
         end: pastDay(0) + 'T' + pastTime(1),
-        // filter_app: "Shark World,Shark Attack,Dino Battle,DINO WORLD,Dinosaur Zoo",
+        filter_app: "Shark World,Shark Attack,Dino Battle,DINO WORLD,Dinosaur Zoo",
         min_dif: 0,
         min_rev: 0,
         time_int: -3
@@ -104,7 +104,7 @@ app.get("/api", (req, res)=>{
     if(Object.keys(req.query).length){
         def_params.start = req.query.start;
         def_params.end = req.query.end;
-        if(req.query.filter_app) def_params.filter_app=req.query.filter_app;
+        def_params.filter_app=req.query.filter_app;
         def_params.min_dif = parseInt(req.query.min_dif);
         def_params.min_rev = parseFloat(req.query.min_rev);
         def_params.time_int = parseInt(req.query.time_int);

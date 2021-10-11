@@ -85,14 +85,14 @@ module.exports=class WarningTable{
 
         const dif=source_params.end-source_params.start;
         
-        const params = {
+        let params = {
             api_key: "U_6ufDXDPxfXT5mJr1TXCfBDawPb6mmr3W01UHfLA6tC5gS_R-aTMng9oG4vXLk7wDJL8H_UKPGL3QtereTazI",
             format: "json",
             start: source_params.start,
             end: source_params.end,
-            filter_application: source_params.filter_app,
             columns: "day,application,network,network_placement,country,estimated_revenue"
         };
+        if(source_params.filter_app!=='all') params[filter_application]=source_params.filter_app;
         
         const fdatafetch = await this.axios.get(url, {params});
 
