@@ -96,7 +96,7 @@ app.get("/api", (req, res)=>{
     const def_params = {
         start: pastDay(0) + 'T' + pastTime(3),
         end: pastDay(0) + 'T' + pastTime(1),
-        filter_app: "Shark World,Shark Attack,Dino Battle,DINO WORLD,Dinosaur Zoo",
+        filter_app: "all",
         min_dif: 0,
         min_rev: 0,
         time_int: -3
