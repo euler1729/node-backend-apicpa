@@ -2,15 +2,14 @@ module.exports=class WarningTable{
     constructor(id_success, id_ans){
         this.id_success=id_success;
         this.id_ans=id_ans;
-        this.fourteendays=1209600000;
+        this.General=require('./general.js');
+        this.general=new this.General();
         this.axios=require('axios');
     }
 
     setToken(token){
         this.token=token;
     }
-    
-    hourToMs = (time) => time*36*1e5;
     
     populateData = (arr, brr, keyAdded) =>{
         return new Promise((res, rej)=>{
@@ -29,10 +28,10 @@ module.exports=class WarningTable{
     param_handler(params){
 
         const now = Date.now();
-        const closeTime = now-now%this.hourToMs(1)-this.hourToMs(1);
+        const closeTime = now-now%this.general.hourToMs(1)-this.general.hourToMs(1);
         if(params.time_int>=0){
-            params.time_int = this.hourToMs(params.time_int);
-            if(params.time_int>this.fourteendays) return 0;
+            params.time_int = this.general.hourToMs(params.time_int);
+            if(params.time_int>this.general.dayToMs(14)) return 0;
             params.end = closeTime;
             params.start = closeTime-params.time_int;
         } else {
@@ -44,34 +43,18 @@ module.exports=class WarningTable{
     }
 
     compare(fdata, sdata, params){
-    
-        function binarySearch(arr, val, compare) {
-            var m = 0;
-            var n = arr.length - 1;
-            while (m <= n) {
-                var k = (n + m) >> 1;
-                var cmp = compare(val, arr[k]);
-                if (cmp > 0) {
-                    m = k + 1;
-                } else if(cmp < 0) {
-                    n = k - 1;
-                } else {
-                    return k;
-                }
-            }
-            return -m - 1;
-        }
 
         return new Promise((res, rej)=>{
             let ans = [];
 
             for (let i = 0; i < fdata.length; ++i) {
                 let dif = 0.0;
-                const j = binarySearch(sdata, fdata[i], (a, b)=>{
+                const j = this.general.binarySearch(sdata, fdata[i], (a, b)=>{
                     if(a.key>b.key) return 1;
                     if(a.key < b.key) return -1
                     return 0;
                 })
+                
                 if(j>=0) {
                     dif = parseFloat(fdata[i].estimated_revenue) - parseFloat(sdata[j].estimated_revenue);
                     let mn = Math.min(parseFloat(fdata[i].estimated_revenue), parseFloat(sdata[j].estimated_revenue));

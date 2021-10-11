@@ -96,7 +96,7 @@ app.get("/api", (req, res)=>{
     const def_params = {
         start: pastDay(0) + 'T' + pastTime(3),
         end: pastDay(0) + 'T' + pastTime(1),
-        filter_app: "Shark World,Shark Attack,Dino Battle,DINO WORLD,Dinosaur Zoo",
+        // filter_app: "Shark World,Shark Attack,Dino Battle,DINO WORLD,Dinosaur Zoo",
         min_dif: 0,
         min_rev: 0,
         time_int: -3
@@ -111,7 +111,6 @@ app.get("/api", (req, res)=>{
     }
 
     const WarningTable = require("../warning_table.js");
-    console.log(typeof(WarningTable));
     const warning_table = new WarningTable(id_success, id_ans)
 
     if(!warning_table.param_handler(def_params)) res.status(400).send("Query Invalid");
@@ -126,7 +125,12 @@ app.get("/api", (req, res)=>{
 
 app.get("/rep", (req, res)=>{
 
-    def_params={range: 3};
+    def_params={
+        range: 3,
+        metrics: "installs,spend",  //for ironSource
+        breakdowns: "day,title",  //for ironSource
+        columns: "day,campaign_package_name,conversions,cost"
+    };
     if(Object.keys(req.query).length)def_params.range=req.query.range;
 
     const CPAGraph=require('../cpa_graph.js');
@@ -136,7 +140,8 @@ app.get("/rep", (req, res)=>{
     id_success[token]=false;
     cpa_graph.setToken(token);
     res.send(token);
-    cpa_graph.repGraph(def_params);
+    // console.log(token);
+    cpa_graph.fetcher(def_params);
 
 })
 
@@ -144,11 +149,15 @@ app.get("/topcntry", (req, res)=>{
 //com.fpg.sharkattack
     const def_params={
         range: 3,
-        filter: "com.fpg.sharkattack",
+        dimension: "location",      //for ming
+        metrics: "installs,spend",  //for ironSource
+        breakdowns: "day,country",  //for ironSource
+        columns: "day,country,conversions,cost",    //for applovin
+        // app_filter: "com.tappocket.dragonvillage"
     }
     if(Object.keys(req.query).length){
         def_params.range = req.query.range;
-        def_params.filter = req.query.filter;
+        def_params.app_filter = req.query.filter;
     }
 
     const CPACountryGraph=require('../cpa_country_graph');
@@ -158,8 +167,9 @@ app.get("/topcntry", (req, res)=>{
     id_success[token]=false;
     cpa_country_graph.setToken(token);
     res.send(token);
+    // console.log(token);
 
-    cpa_country_graph.topcntry(def_params);
+    cpa_country_graph.fetcher(def_params);
 })
 
 //requires range in source_params
@@ -228,94 +238,96 @@ async function mintegral_advanced(source_params){
     return ans;
 }
 
-async function mintegral(source_params, func){
-    console.log("Fetching from mintegral API...");
 
-    const now = Date.now();
-    const closetime = now-now%dayToMs(1)-dayToMs(1);
-
-    const timestamp = Math.floor( (new Date()).getTime()/1000 ).toString();
-    const api_key="a0f2ca38a43ce39ce8d4408cfa590111";
-    const username="ziau";
-    const mintegral_url="https://ss-api.mintegral.com/api/v1/reports/data?" + "username=" + username + "&token=" + md5(api_key + md5(timestamp)) + "&timestamp=" + timestamp;
-
-    const params={
-        timezone: "+6",
-        start_time: Math.floor((closetime-dayToMs(source_params.range-1))/1000),
-        end_time: Math.floor((closetime)/1000),
-    }
-    const data=await axios.get(mintegral_url, {params});
-    const ans=await func(data.data.data);
-
-    console.log(`Fetched ${data.data.data.length} data in ${Date.now()-now}ms`);
-
-    // console.log(ans);
-    return ans;
-}
 
 app.get("/mint", (req, res)=>{
     def_params={
-        range: 3
+        range: 3,
+        // dimension: "location",
+        // app_filter: "com.tappocket.dragonvillage"
     };
-    mintegral(def_params)
+    const General=require('../general.js');
+    const general=new General();
+    general.mintegral(def_params, (arr)=>{
+        // console.log(arr);
+        const brr=[];
+        for(let i=0; i<arr.length-1; i++){
+            let pushObj=brr.find(obj=>((obj.date===arr[i].date)&&(obj.package_name===arr[i].package_name)))
+            if(!pushObj){
+                brr.push({
+                    date: arr[i].date,
+                    package_name: arr[i].package_name,
+                    install: arr[i].install,
+                    spend: arr[i].spend,
+                    // package_name: arr[i].package_name
+                })
+            }
+            else {
+                pushObj.install += arr[i].install;
+                pushObj.spend += arr[i].spend;
+            }
+        }
+        return new Promise((res, rej)=>{
+            res(brr);
+        });
+    })
     .then(data=>{res.send(data);})
     .catch(err=>{console.log(err);});
 })
 
-//requires metrics and range in source_params
-async function is(source_params, func) {
+app.get("/is", (req, res)=>{
+    const def_params={
+        range: 3,
+        // app_filter: "com.tappocket.dragonvillage",
+        metrics: "installs,spend",
+        breakdowns: "day,title"         //title breakdowns give titleBundleId
+    }
 
-    const now = Date.now();
-    console.log("Fetching from ironSource API...");
-
-    const auth_url="https://platform.ironsrc.com/partners/publisher/auth";
-    const req_url="https://api.ironsrc.com/advertisers/v2/reports?";
-    const headers={
-        secretkey: '7f9d6dcdc53d127e16df780183d8554a',
-        refreshToken: '90a0340af3ae4858a8245e8b49dfad4d'
-    }
-    const params={
-        startDate: pastDay(source_params.range),
-        endDate: pastDay(1),
-        metrics: source_params.metrics,
-        breakdowns: "day"
-        // breakdown: "date"
-    }
-    if(!ironSource_auth) {
-        const auth_res=await axios.get(auth_url, {headers: headers});
-        ironSource_auth = auth_res.data;
-    }
-    const data=await axios.get(req_url, {
-        headers: {
-            Authorization: 'Bearer ' + ironSource_auth
-        },
-        params: params
+    const General=require('../general.js');
+    const general=new General();
+    general.is(def_params, (arr)=>{
+        // console.log(arr);
+        const brr=[];
+        for(let i in arr){
+            brr.push({
+                date: arr[i].date.slice(0, 10),
+                package_name: arr[i].titleBundleId,
+                install: arr[i].installs,
+                spend: arr[i].spend
+            })
+        }
+        return new Promise((res, rej)=>{
+            res(brr);
+        })
     })
-    console.log(`Fetched ${data.data.data.length} data from ironSource in ${Date.now()-now}ms`);
-    const ans=await func(data.data.data);
-    return ans;
-}
+    .then(data=>(res.send(data)))
+    .catch(err=>{console.log(err);});
+})
 
-//requires range in source_params
-async function applovin(source_params){
+app.get("/app", (req, res)=>{
+    const def_params={
+        range: 3,
+        // app_filter: "com.tappocket.dragonvillage",
+        columns: "day,campaign_package_name,conversions,cost"
+    };
 
-    const now=Date.now();
-    console.log("Fetching from applovin API...");
-
-    const applovin_url="https://r.applovin.com/report";
-    const params={
-        api_key: "U_6ufDXDPxfXT5mJr1TXCfBDawPb6mmr3W01UHfLA6tC5gS_R-aTMng9oG4vXLk7wDJL8H_UKPGL3QtereTazI",
-        format: "json",
-        start: pastDay(source_params.range),
-        end: pastDay(1),
-        sort_day: "DESC",
-        columns: "day,average_cpa",
-        report_type: "advertiser"
-    }
-    const data=await axios.get(applovin_url, {params});
-    console.log(`Fetched ${data.data.results.length} data from applovin in ${Date.now()-now}ms`);
-    return data.data.results;
-}
+    const General=require('../general.js');
+    const general=new General();
+    general.applovin(def_params, (arr)=>{
+        const brr=[];
+        for(let i=0; i<arr.length; i++){
+            brr.push({
+                date: arr[i].day,
+                bundleId: arr[i].campaign_package_name,
+                install: arr[i].conversions,
+                spend: arr[i].cost
+            })
+        }
+        return brr;
+    })
+    .then(data=>(res.send(data)))
+    .catch(err=>{console.log(err);});
+})
 
 async function compareAPIdata(source_params, token){
 
@@ -342,9 +354,7 @@ async function compareAPIdata(source_params, token){
             }
         }
         for(let obj of brr) obj.cpi=obj.install/obj.spend;
-        return new Promise((res, rej)=>{
-            res(brr);
-        });
+        return brr;
     })
     mintegral_data.sort((a, b)=>a.date>b.date?1:-1);
     const ironSource_data=await is(source_params, (arr)=>{

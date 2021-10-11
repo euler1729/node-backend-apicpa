@@ -2,33 +2,40 @@ module.exports=class CPAGraph{
     constructor(id_success, id_ans){
         this.id_success=id_success;
         this.id_ans=id_ans
-        this.axios=require('axios');
+        this.General=require('./general.js');
+        this.general=new this.General();
     }
 
     setToken(token){
         this.token=token
     }
 
-    dayToMs = (day) => day*864*1e5;       //converts one day to millisecond
-
-    async dateList(range){
-
+    compress(datalist){
         let brr=[];
-        let pushDate=range.start;
-        brr.push((new Date(pushDate).toJSON().slice(0, 10)));
-
-        while(pushDate!==range.end){
-            pushDate+=this.dayToMs(1);
-            brr.push((new Date(pushDate).toJSON().slice(0, 10)));
-        }
-
+        for(let i=0; i<datalist.length; i++)
+            for(let row of datalist[i]){
+                const pushObj=brr.find(obj=>obj.date===row.date&&obj.bundleId===row.bundleId);
+                if(!pushObj){
+                    brr.push({
+                        date: row.date,
+                        bundleId: row.bundleId,
+                        install: parseInt(row.install),
+                        spend: parseFloat(row.spend)
+                    })
+                }
+                else {
+                    pushObj.install += parseInt(row.install);
+                    pushObj.spend += parseFloat(row.spend);
+                }
+            }
+        brr.sort((a, b)=>a.date>b.date?1:-1);
         return new Promise((res, rej)=>{
+            // console.log(brr);
             res(brr);
         })
     }
 
-    async fracture(arr, date){
-
+    datagen(arr){
         const color = [
             "#C0C0C0", "#808080", "#000000", "#FF0000",	"#800000", "#FFFF00", "#808000", "#00FF00 ", "#008000 ", "#00FFFF", "#008080",
             "#0000FF", "#000080", "#FF00FF", "#800080", "#CD5C5C"];
@@ -36,36 +43,39 @@ module.exports=class CPAGraph{
             labels:[],
             datasets:[]
         };
-        for(let i=0; i<date.length; i++) brr.labels.push(date[i]);
+
+        brr.labels=this.dateList;
 
         for(let i=0; i<arr.length; i++){
 
-            const pushobj = brr.datasets.find(obj=>obj.label===arr[i].campaign_package_name);
+            const pushobj = brr.datasets.find(obj=>obj.label===arr[i].bundleId);
             if(!pushobj) {
-                if(arr[i].day !== date[0]){
+                if(arr[i].date !== this.dateList[0]){
                     brr.datasets.push({
-                        label: arr[i].campaign_package_name,
+                        label: arr[i].bundleId,
                         data: [0],
                         borderColor: color[brr.datasets.length-1],
                         tension: 0.5,
                         borderWidth:1,
                     })
-                    for(let j=1; j<date.length && arr[i].day !== date[j]; j++) 
+                    for(let j=1; j<this.dateList.length && arr[i].date !== this.dateList[j]; j++) 
                         brr.datasets[brr.datasets.length-1].data.push(0);
-                    brr.datasets[brr.datasets.length-1].data.push(parseFloat(arr[i].average_cpa));
+                    brr.datasets[brr.datasets.length-1].data.push(
+                        arr[i].install?arr[i].spend/parseFloat(arr[i].install):0
+                    );
                 }
                 else brr.datasets.push({
-                    label:arr[i].campaign_package_name,
-                    data: [parseFloat(arr[i].average_cpa)],
+                    label:arr[i].bundleId,
+                    data: [arr[i].install?arr[i].spend/parseFloat(arr[i].install):0],
                     borderColor: color[brr.datasets.length-1],
                     tension: 0.5,
                     borderWidth:1,
                 });
             }
             else {
-                const days = date.findIndex(obj=>obj===arr[i].day);
+                const days = this.dateList.findIndex(obj=>obj===arr[i].day);
                 while(pushobj.data.length < days) pushobj.data.push(0);
-                pushobj.data.push(parseFloat(arr[i].average_cpa));
+                pushobj.data.push(arr[i].install?arr[i].spend/parseFloat(arr[i].install):0);
             }
 
         }
@@ -74,33 +84,68 @@ module.exports=class CPAGraph{
         })
     }
 
-    async repGraph(source_params){
+    async fetcher(source_params){
 
-        const now = Date.now();
-        const closeTime = now-now%this.dayToMs(1)-this.dayToMs(1);
+        const mint_data=await this.general.mintegral(source_params,  (arr)=>{
+            // console.log(arr);
+            const brr=[];
+            for(let i=0; i<arr.length-1; i++){
+                let pushObj=brr.find(obj=>((obj.date===arr[i].date)&&(obj.bundleId===arr[i].package_name)))
+                if(!pushObj){
+                    brr.push({
+                        date: arr[i].date,
+                        bundleId: arr[i].package_name,
+                        install: arr[i].install,
+                        spend: arr[i].spend
+                    })
+                }
+                else {
+                    pushObj.install += parseInt(arr[i].install);
+                    pushObj.spend += parseFloat(arr[i].spend);
+                }
+            }
+            return brr;
+        })
 
-        const url="http://r.applovin.com/report";
+        const is_data=await this.general.is(source_params, (arr)=>{
+            // console.log(arr);
+            const brr=[];
+            for(let i in arr){
+                brr.push({
+                    date: arr[i].date.slice(0, 10),
+                    bundleId: arr[i].titleBundleId,
+                    install: arr[i].installs,
+                    spend: arr[i].spend
+                })
+            }
+            return brr;
+        })
 
-        const params={
-            api_key: "U_6ufDXDPxfXT5mJr1TXCfBDawPb6mmr3W01UHfLA6tC5gS_R-aTMng9oG4vXLk7wDJL8H_UKPGL3QtereTazI",
-            format: "json",
-            end: closeTime,
-            start: closeTime-this.dayToMs(source_params.range-1),
-            sort_day: "ASC",
-            columns: "day,campaign_package_name,average_cpa",
-            report_type: "advertiser"
-        }
+        const applovin_data=await this.general.applovin(source_params, (arr)=>{
+            const brr=[];
+            for(let i=0; i<arr.length; i++){
+                brr.push({
+                    date: arr[i].day,
+                    bundleId: arr[i].campaign_package_name,
+                    install: arr[i].conversions,
+                    spend: arr[i].cost
+                })
+            }
+            return brr;
+        })
 
-        const time_req = Date.now();
+        let now = Date.now();
+        now = now-now%this.general.dayToMs(1)-this.general.dayToMs(1);
 
-        console.log(`Fetching from ${url}...`);
+        this.dateList=await this.general.dateList({
+            start: now-this.general.dayToMs(source_params.range-1),
+            end: now
+        })
+        const compress_data=await this.compress([mint_data, is_data, applovin_data])
+        const ans=await this.datagen(compress_data);
 
-        const dates = await this.dateList({start: params.start, end: params.end});
-        const data = await this.axios.get(url, {params})
-        console.log(`Fetched ${data.data.results.length} rows in ${Date.now()-time_req}ms`);
-        const fracturedData = await this.fracture(data.data.results, dates);
-        this.id_ans[this.token]=fracturedData;
         this.id_success[this.token]=true;
-        return;
+        this.id_ans[this.token]=ans;
+        return [mint_data, is_data, applovin_data];
     }
 }
