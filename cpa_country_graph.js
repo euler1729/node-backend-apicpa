@@ -55,13 +55,14 @@ module.exports=class CPACountryGraph{
                                 label: row.country,
                                 data: [0],
                                 borderColor: color[brr.datasets.length-1],
+                                backgroundColor: color[brr.datasets.length-1],
                                 tension: 0.5,
                                 borderWidth:1,
                             });
-                            if(i==='0') crr[row.country]={install: [0], spend: [1]};
+                            if(!crr[row.country]) crr[row.country]={install: [0], spend: [1]};
                             for(let k=1; k<this.dateList.length && row.date!==this.dateList[k]; k++){
                                 brr[parseInt(1)+parseInt(i)].datasets[brr[parseInt(1)+parseInt(i)].datasets.length-1].data.push(0);
-                                if(i==='0') {
+                                if(!crr[row.country]) {
                                     crr[row.country].install.push(0);
                                     crr[row.country].spend.push(1);
                                 }
@@ -69,7 +70,7 @@ module.exports=class CPACountryGraph{
                             brr[parseInt(1)+parseInt(i)].datasets[brr[parseInt(1)+parseInt(i)].datasets.length-1].data.push(
                                 row.install?(row.spend)/parseFloat(row.install):0
                             );
-                            if(i==='0') {
+                            if(!crr[row.country]) {
                                 crr[row.country].install.push(row.install);
                                 crr[row.country].spend.push(row.spend);
                             }
@@ -82,7 +83,7 @@ module.exports=class CPACountryGraph{
                                 tension: 0.5,
                                 borderWidth:1,
                             })
-                            if(i==='0') crr[row.country]={install: [row.install], spend: [row.spend]};
+                            if(!crr[row.country]) crr[row.country]={install: [row.install], spend: [row.spend]};
                         }
                     }
                     else {
@@ -93,7 +94,7 @@ module.exports=class CPACountryGraph{
                             crr[row.country].spend.push(1);
                         }
                         pushObj.data.push(row.install?(row.spend)/parseFloat(row.install):0);
-                        if(i==='0') {
+                        if(!crr[row.country]) {
                             crr[row.country].install.push(row.install);
                             crr[row.country].spend.push(row.spend);
                         }

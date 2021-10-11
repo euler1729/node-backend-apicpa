@@ -153,7 +153,7 @@ app.get("/topcntry", (req, res)=>{
         metrics: "installs,spend",  //for ironSource
         breakdowns: "day,country",  //for ironSource
         columns: "day,country,conversions,cost",    //for applovin
-        // app_filter: "com.tappocket.dragonvillage"
+        app_filter: "com.tappocket.dragonvillage"
     }
     if(Object.keys(req.query).length){
         def_params.range = req.query.range;
