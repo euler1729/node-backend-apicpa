@@ -174,12 +174,12 @@ app.get("/topcntry", (req, res)=>{
     const token=uuidv4();
     id_success[token]=false;
     cpa_country_graph.setToken(token);
-    // res.send(token);
-    console.log(token);
+    res.send(token);
+    // console.log(token);
 
-    cpa_country_graph.fetcher(def_params)
-    .then(data=>{res.send(data);})
-    .catch(err=>{console.log(err);});
+    cpa_country_graph.fetcher(def_params);
+    // .then(data=>{res.send(data);})
+    // .catch(err=>{console.log(err);});
 })
 
 //requires range in source_params
