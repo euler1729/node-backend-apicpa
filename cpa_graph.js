@@ -102,8 +102,8 @@ module.exports=class CPAGraph{
                     brr.datasets.push({
                         label: arr[i].bundleId,
                         data: [0],
-                        borderColor: color[brr.datasets.length-1],
-                        backgroundColor: color[brr.datasets.length-1],
+                        borderColor: color[brr.datasets.length],
+                        backgroundColor: color[brr.datasets.length],
                         tension: 0.5,
                         borderWidth:1,
                     })
