@@ -194,11 +194,6 @@ module.exports=class CPAGraph{
             '#ECEFF1',
             '#CFD8DC',];
         let brr=[];
-        brr.push({
-            title: "cpa_graph",
-            labels: this.dateList,
-            datasets: []
-        })
         for(let i=0; i<dataList.length; i++){
             for(let row of dataList[i]){
                 let chart=brr.find(obj=>obj.title===row.bundleId);
