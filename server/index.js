@@ -466,21 +466,21 @@ async function compareAPIdata(source_params, token){
         brr.datasets.push({
             label: "mintegral",
             data: mintegral_data[0].date===date[0]?[mintegral_data[0].cpi]:[0],
-            borderColor: '#B71C1C',
+            borderColor: '#ae30d1',
             tension: 0.5,
             borderWidth:1,
         })
         brr.datasets.push({
             label: "ironSource",
             data: ironSource_data[0].date===date[0]?[ironSource_data[0].cpa]:[0],
-            borderColor: '#FF8A80',
+            borderColor: '#efcba7',
             tension: 0.5,
             borderWidth:1,
         })
         brr.datasets.push({
             label: "applovin",
             data: applovin_data[0].day===date[0]?[applovin_data[0].average_cpa]:[0],
-            borderColor: '#F06292',
+            borderColor: '#982bf2',
             tension: 0.5,
             borderWidth:1,
         })
