@@ -34,7 +34,7 @@ const pastDay = (days) =>{                  //finds the date (days) before now. 
     let time = Date.now();
     time = time - time%dayToMs(1) - dayToMs(days);
     return (new Date(time)).toJSON().slice(0, 10); 
-}                                           
+}
 const pastTime = (hours) =>{                //finds the time (hours) before now. pastTime(1) is the last complete hour in the form HH:MM
     let time = Date.now();
     time = time - time%hourToMs(1) - hourToMs(hours);
