@@ -142,11 +142,11 @@ app.get("/rep", (req, res)=>{
     const token=uuidv4();
     id_success[token]=false;
     cpa_graph.setToken(token);
-    console.log(token);
-    // res.send(token);
-    cpa_graph.fetcher(def_params)
-    .then(data=>{res.send(data);})
-    .catch(err=>{console.log(err)});
+    // console.log(token);
+    res.send(token);
+    cpa_graph.fetcher(def_params);
+    // .then(data=>{res.send(data);})
+    // .catch(err=>{console.log(err)});
 
 })
 
