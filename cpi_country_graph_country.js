@@ -30,7 +30,7 @@ module.exports = class CPACountryGraph {
         brr.sort((a, b) => a.spend < b.spend ? 1 : -1); //descending sort
 
         const country_list = [];
-        for (let i = 0; i < brr.length && i < 5; i++) {
+        for (let i = 0; i < brr.length && i < 15; i++) {
             country_list.push(brr[i].country);
         }
         return new Promise((res, rej) => {
@@ -143,6 +143,22 @@ module.exports = class CPACountryGraph {
         })
     }
 
+    addAll(arr){
+        for(let i=1; i<arr.length; i++){
+            const allData=arr[0].datasets.find(obj=>obj.label===arr[i].title);
+            arr[i].datasets.push({
+                label: "all",
+                data: allData.data,
+                borderColor: this.general.color[arr[i].datasets.length],
+                backgroundColor: this.general.color[arr[i].datasets.length],
+                tension: 0.5,
+                borderWidth:1,
+            })
+        }
+        arr[0].datasets=arr[0].datasets.slice(0, 5);
+        return new Promise((res, rej)=>{res();});
+    }
+
     async fetcher(source_params) {
 
         const mint_data = await this.general.mintegral(source_params, (arr) => {
@@ -223,7 +239,13 @@ module.exports = class CPACountryGraph {
         })
         this.country_list=await this.country_list_generator([mint_data, is_data, applovin_data, unity_data]);
         const ans=await this.datagen([mint_data, is_data, applovin_data, unity_data]);
-
+        await this.addAll(ans);
+        ans.sort((a, b)=>{
+            if(a.title&&b.title){
+                return (this.country_list.findIndex(obj=>obj===a.title)>this.country_list.findIndex(obj=>obj===b.title)?1:-1);
+            }
+            return 0;
+        })
         this.id_success[this.token]=true;
         this.id_ans[this.token]=ans;
         return [mint_data, is_data, applovin_data, unity_data];

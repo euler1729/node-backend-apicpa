@@ -37,56 +37,6 @@ module.exports=class CPAGraph{
     }
 
     datagen_main(arr){
-        const color = [
-            '#ae30d1',
-            '#e27add',
-            '#ad4e2b',
-            '#5ad617',
-            '#fcdf94',
-            '#f9a4b8',
-            '#adffc0',
-            '#70e23b',
-            '#627cc4',
-            '#efcba7',
-            '#137184',
-            '#c14819',
-            '#d89365',
-            '#bce7ff',
-            '#70f4d5',
-            '#c691ea',
-            '#ed7b8e',
-            '#a9c7e8',
-            '#6953e2',
-            '#f4a4c7',
-            '#f9e070',
-            '#1298d1',
-            '#eadb02',
-            '#fc14e9',
-            '#1db215',
-            '#b8d33f',
-            '#4cef40',
-            '#982bf2',
-            '#edb253',
-            '#690caf',
-            '#06a30b',
-            '#cfbfff',
-            '#8ee886',
-            '#5edb68',
-            '#067f6d',
-            '#93143c',
-            '#58cc2a',
-            '#d86ccd',
-            '#e26c04',
-            '#2de282',
-            '#f29398',
-            '#34af03',
-            '#edc363',
-            '#5ed6ca',
-            '#1cdb42',
-            '#c7d843',
-            '#e8ed8e',
-            '#b890db',
-        ];
         let brr={
             labels:[],
             datasets:[]
@@ -102,8 +52,8 @@ module.exports=class CPAGraph{
                     brr.datasets.push({
                         label: arr[i].bundleId,
                         data: [0],
-                        borderColor: color[brr.datasets.length],
-                        backgroundColor: color[brr.datasets.length],
+                        borderColor: this.general.color[brr.datasets.length],
+                        backgroundColor: this.general.color[brr.datasets.length],
                         tension: 0.5,
                         borderWidth:1,
                     })
@@ -116,8 +66,8 @@ module.exports=class CPAGraph{
                 else brr.datasets.push({
                     label:arr[i].bundleId,
                     data: [arr[i].install?arr[i].spend/parseFloat(arr[i].install):0],
-                    borderColor: color[brr.datasets.length],
-                    backgroundColor: color[brr.datasets.length],
+                    borderColor: this.general.color[brr.datasets.length],
+                    backgroundColor: this.general.color[brr.datasets.length],
                     tension: 0.5,
                     borderWidth:1,
                 });
@@ -127,7 +77,6 @@ module.exports=class CPAGraph{
                 while(pushobj.data.length < days) pushobj.data.push(0);
                 pushobj.data.push(arr[i].install?arr[i].spend/parseFloat(arr[i].install):0);
             }
-
         }
         return new Promise((res, rej)=>{
             res(brr);
@@ -135,57 +84,6 @@ module.exports=class CPAGraph{
     }
 
     datagen_subsequent(dataList){
-        const color = [
-            '#ae30d1',
-            '#e27add',
-            '#ad4e2b',
-            '#5ad617',
-            '#fcdf94',
-            '#f9a4b8',
-            '#adffc0',
-            '#70e23b',
-            '#627cc4',
-            '#efcba7',
-            '#137184',
-            '#c14819',
-            '#d89365',
-            '#bce7ff',
-            '#70f4d5',
-            '#c691ea',
-            '#ed7b8e',
-            '#a9c7e8',
-            '#6953e2',
-            '#f4a4c7',
-            '#f9e070',
-            '#1298d1',
-            '#eadb02',
-            '#fc14e9',
-            '#1db215',
-            '#b8d33f',
-            '#4cef40',
-            '#982bf2',
-            '#edb253',
-            '#690caf',
-            '#06a30b',
-            '#cfbfff',
-            '#8ee886',
-            '#5edb68',
-            '#067f6d',
-            '#93143c',
-            '#58cc2a',
-            '#d86ccd',
-            '#e26c04',
-            '#2de282',
-            '#f29398',
-            '#34af03',
-            '#edc363',
-            '#5ed6ca',
-            '#1cdb42',
-            '#c7d843',
-            '#e8ed8e',
-            '#b890db',
-    
-        ];
         let brr=[];
         for(let i=0; i<dataList.length; i++){
             for(let row of dataList[i]){
@@ -204,8 +102,8 @@ module.exports=class CPAGraph{
                         chart.datasets.push({
                             label: this.apiList[i],
                             data: [0],
-                            borderColor: color[chart.datasets.length],
-                            backgroundColor: color[chart.datasets.length],
+                            borderColor: this.general.color[chart.datasets.length],
+                            backgroundColor: this.general.color[chart.datasets.length],
                             tension: 0.5,
                             borderWidth:1,
                         })
@@ -216,8 +114,8 @@ module.exports=class CPAGraph{
                     else chart.datasets.push({
                         label: this.apiList[i],
                         data: [row.install?(row.spend)/parseFloat(row.install):0],
-                        borderColor: color[chart.datasets.length],
-                        backgroundColor: color[chart.datasets.length],
+                        borderColor: this.general.color[chart.datasets.length],
+                        backgroundColor: this.general.color[chart.datasets.length],
                         tension: 0.5,
                         borderWidth:1,
                     })
@@ -232,6 +130,21 @@ module.exports=class CPAGraph{
         return new Promise((res, rej)=>{
             res(brr);
         })
+    }
+
+    addAll(sec, fir){
+        for(let i=0; i<sec.length; i++){
+            const allData=fir.datasets.find(obj=>obj.label===sec[i].title);
+            sec[i].datasets.push({
+                label: "all",
+                data: allData.data,
+                borderColor: this.general.color[sec[i].datasets.length],
+                backgroundColor: this.general.color[sec[i].datasets.length],
+                tension: 0.5,
+                borderWidth:1,
+            })
+        }
+        return new Promise((res, rej)=>{res();});
     }
 
     async fetcher(source_params){
@@ -322,6 +235,7 @@ module.exports=class CPAGraph{
         const compress_data=await this.compress([mint_data, is_data, applovin_data, unity_data])
         const ans_one=await this.datagen_main(compress_data);
         const ans_two=await this.datagen_subsequent([mint_data, is_data, applovin_data, unity_data]);
+        await this.addAll(ans_two, ans_one);
 
         this.id_success[this.token]=true;
         this.id_ans[this.token]=[ans_one, ans_two];
