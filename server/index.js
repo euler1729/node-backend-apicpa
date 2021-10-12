@@ -168,7 +168,7 @@ app.get("/topcntry", (req, res)=>{
         def_params.app_filter = req.query.filter;
     }
 
-    const CPACountryGraph=require('../cpa_country_graph');
+    const CPACountryGraph=require('../cpa_country_graph_api.js');
     const cpa_country_graph=new CPACountryGraph(id_success, id_ans);
 
     const token=uuidv4();
@@ -178,6 +178,38 @@ app.get("/topcntry", (req, res)=>{
     // console.log(token);
 
     cpa_country_graph.fetcher(def_params);
+    // .then(data=>{res.send(data);})
+    // .catch(err=>{console.log(err);});
+})
+
+app.get("/topcntrycntry", (req, res)=>{
+//com.fpg.sharkattack
+    const def_params={
+        range: 3,
+        dimension: "location",      //for ming
+        metrics: "installs,spend",  //for ironSource
+        breakdowns: "day,country",  //for ironSource
+        columns: "day,country,conversions,cost",    //for applovin
+        scale: "day",                                     //for unity
+        fields: "timestamp,country,installs,spend",        //for unity
+        splitBy: "country",                                 //for unity
+        app_filter: "com.tappocket.dragonvillage"
+    }
+    if(Object.keys(req.query).length){
+        def_params.range = req.query.range;
+        def_params.app_filter = req.query.filter;
+    }
+
+    const CPACountryGraph=require('../cpi_country_graph_country.js');
+    const cpa_country_graph_country=new CPACountryGraph(id_success, id_ans);
+
+    const token=uuidv4();
+    id_success[token]=false;
+    cpa_country_graph_country.setToken(token);
+    res.send(token);
+    // console.log(token);
+
+    cpa_country_graph_country.fetcher(def_params);
     // .then(data=>{res.send(data);})
     // .catch(err=>{console.log(err);});
 })
