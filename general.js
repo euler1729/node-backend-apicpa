@@ -140,4 +140,27 @@ module.exports=class General{
         const ans=await func(data.data.results);
         return ans;
     }
+
+    async unity(source_params, func=(arr)=>arr){
+
+        const now =Date.now();
+        console.log("Fetching data from Unity API");
+
+        const url="https://stats.unityads.unity3d.com/organizations/5c46f835a31702001cf702f7/reports/acquisitions?"
+
+        //start and end special for unity. I don't know why.
+        //update: start and end now works un-differently. what is happening
+        let params={
+            apikey: "a6b260c4b4b869012b29536df455ccca9bd7b9865736fb552b8b3da2555e7dd4",
+            start: (this.pastDay(source_params.range)),
+            end: (this.pastDay(0)),
+            scale: source_params.scale,
+            splitBy: source_params.splitBy,
+            fields: source_params.fields
+        }
+        const data=await this.axios(url, {params});
+        console.log(`Fetched ${data.data.length} data from unity in ${Date.now()-now}ms`);
+        const ans=await func(data.data);
+        return ans;
+    }
 }

@@ -127,9 +127,12 @@ app.get("/rep", (req, res)=>{
 
     def_params={
         range: 3,
-        metrics: "installs,spend",  //for ironSource
-        breakdowns: "day,title",  //for ironSource
-        columns: "day,campaign_package_name,conversions,cost"
+        metrics: "installs,spend",   //for ironSource
+        breakdowns: "day,title",     //for ironSource
+        columns: "day,campaign_package_name,conversions,cost",  //for applovin
+        scale: "day",                                     //for unity
+        fields: "timestamp,target,installs,spend",        //for unity
+        splitBy: "target"                                 //for unity
     };
     if(Object.keys(req.query).length)def_params.range=req.query.range;
 
@@ -139,9 +142,11 @@ app.get("/rep", (req, res)=>{
     const token=uuidv4();
     id_success[token]=false;
     cpa_graph.setToken(token);
-    res.send(token);
-    // console.log(token);
-    cpa_graph.fetcher(def_params);
+    console.log(token);
+    // res.send(token);
+    cpa_graph.fetcher(def_params)
+    .then(data=>{res.send(data);})
+    .catch(err=>{console.log(err)});
 
 })
 
@@ -153,6 +158,9 @@ app.get("/topcntry", (req, res)=>{
         metrics: "installs,spend",  //for ironSource
         breakdowns: "day,country",  //for ironSource
         columns: "day,country,conversions,cost",    //for applovin
+        scale: "day",                                     //for unity
+        fields: "timestamp,country,installs,spend",        //for unity
+        splitBy: "country",                                 //for unity
         app_filter: "com.tappocket.dragonvillage"
     }
     if(Object.keys(req.query).length){
@@ -166,10 +174,12 @@ app.get("/topcntry", (req, res)=>{
     const token=uuidv4();
     id_success[token]=false;
     cpa_country_graph.setToken(token);
-    res.send(token);
-    // console.log(token);
+    // res.send(token);
+    console.log(token);
 
-    cpa_country_graph.fetcher(def_params);
+    cpa_country_graph.fetcher(def_params)
+    .then(data=>{res.send(data);})
+    .catch(err=>{console.log(err);});
 })
 
 //requires range in source_params
@@ -328,6 +338,48 @@ app.get("/app", (req, res)=>{
     .then(data=>(res.send(data)))
     .catch(err=>{console.log(err);});
 })
+
+app.get("/unity", (req, res)=>{
+    const def_params={
+        range: 3,
+        scale: "day",
+        fields: "timestamp,country,installs,spend",
+        splitBy: "country"
+    }
+    
+    const General=require('../general.js');
+    const general=new General();
+    general.unity(def_params, (arr)=>{
+        
+        let brr=[];
+        arr=arr.split('\n');
+        arr[0]=arr[0].split(',');
+        for(let i=1; i<arr.length-1; i++){
+            arr[i]=arr[i].replace(/"/g,"").split(',');
+            brr.push({
+                date: arr[i][0].slice(0, 10),
+                country: arr[i][1].toLowerCase(),
+                installs: arr[i][2],
+                spend: arr[i][3]
+            })
+        }
+        return new Promise((res, rej)=>{
+            res(brr);
+        })
+    })
+    .then(data=>{res.send(data);})
+    .catch(err=>{console.log(err);});
+})
+//unity data split by target
+//  {
+//     date: '2021-10-10',
+//     'target id': '"500048102"',
+//     'target store id': '"com.fpg.sharkslap"',
+//     'target name': '"Shark Attack 3D"',
+//     installs: '145',
+//     spend: '17.3'
+// },
+
 
 async function compareAPIdata(source_params, token){
 

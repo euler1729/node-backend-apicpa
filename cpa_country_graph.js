@@ -437,6 +437,24 @@ module.exports=class CPACountryGraph{
         })
         applovin_data.sort((a, b)=>a.date>b.date?1:-1);
 
+        const unity_data=await this.general.unity(source_params, (arr)=>{
+        
+            let brr=[];
+            arr=arr.split('\n');
+            arr[0]=arr[0].split(',');
+            for(let i=1; i<arr.length-1; i++){
+                arr[i]=arr[i].replace(/"/g,"").split(',');
+                brr.push({
+                    date: arr[i][0].slice(0, 10),
+                    country: arr[i][1].toLowerCase(),
+                    install: arr[i][2],
+                    spend: arr[i][3]
+                })
+            }
+            return brr
+        })
+        unity_data.sort((a, b)=>a.date>b.date?1:-1);
+
         let now = Date.now();
         now = now-now%this.general.dayToMs(1)-this.general.dayToMs(1);
 
@@ -444,11 +462,11 @@ module.exports=class CPACountryGraph{
             start: now-this.general.dayToMs(source_params.range-1),
             end: now
         })
-        this.country_list=await this.country_list_generator([mint_data, is_data, applovin_data]);
-        const ans=await this.datagen([mint_data, is_data, applovin_data]);
+        this.country_list=await this.country_list_generator([mint_data, is_data, applovin_data, unity_data]);
+        const ans=await this.datagen([mint_data, is_data, applovin_data, unity_data]);
 
         this.id_success[this.token]=true;
         this.id_ans[this.token]=ans;
-        return [mint_data, is_data, applovin_data];
+        return [mint_data, is_data, applovin_data, unity_data];
     }
 }
